@@ -253,9 +253,8 @@
   .minihead button{border:none;background:none;cursor:pointer;font-size:14px;color:var(--muted)}
   .minitray{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:224px}
   .mkc{width:46px;height:46px;border-radius:10px;position:relative;overflow:hidden;cursor:pointer;background-size:cover;background-position:center;
-    background:linear-gradient(180deg,color-mix(in srgb,var(--c) 90%,#fff),var(--c));
     box-shadow:0 5px 0 var(--s),0 7px 8px rgba(60,40,90,.2);transform:translateY(0);transition:transform .05s,box-shadow .05s;display:flex;align-items:center;justify-content:center}
-  .mkc.pressed{transform:translateY(5px);box-shadow:0 1px 0 var(--s),0 3px 5px rgba(60,40,90,.2)}
+  .mkc.p{transform:translateY(5px);box-shadow:0 1px 0 var(--s),0 3px 5px rgba(60,40,90,.2)}
   .mkc .l{font-weight:700;font-size:16px;line-height:1;pointer-events:none}
   .mkc .f{font-size:22px;line-height:1;pointer-events:none}
   footer{text-align:center;font-size:10.5px;color:var(--muted);margin-top:2px;line-height:1.5}
@@ -598,19 +597,48 @@ document.getElementById('saveTheme').addEventListener('click',()=>{
 });
 renderThemes();
 
-/* ---- 미니 키캡 팝업 ---- */
+/* ---- 미니 키캡: 분리된 팝업 창 ---- */
 const miniPop=document.getElementById('miniPop'), miniTray=document.getElementById('miniTray');
-function renderMini(){ miniTray.innerHTML='';
-  keycaps.forEach((kc,i)=>{ const el=document.createElement('div'); el.className='mkc'; el.dataset.i=i;
-    el.style.cssText='--c:'+kc.cap+';--s:'+kc.side+(kc.image?(';background-image:url('+kc.image+')'):'');
-    el.innerHTML = kc.figure?('<span class="f">'+escapeHtml(kc.figure)+'</span>') : (kc.legend?('<span class="l" style="color:'+kc.legendColor+';font-family:'+FONTS[kc.font].ff+'">'+escapeHtml(kc.legend)+'</span>'):'');
-    miniTray.appendChild(el); });
+function miniKcMarkup(){
+  return keycaps.map((kc,i)=>{
+    const bg = kc.image ? ('background:url('+kc.image+') center/cover') : ('background:linear-gradient(180deg,'+shade(kc.cap,0.08)+','+kc.cap+')');
+    const inner = kc.figure ? ('<span class="f">'+escapeHtml(kc.figure)+'</span>') : (kc.legend ? ('<span class="l" style="color:'+kc.legendColor+';font-family:'+FONTS[kc.font].ff+'">'+escapeHtml(kc.legend)+'</span>') : '');
+    return '<div class="mkc" data-i="'+i+'" style="--s:'+kc.side+';'+bg+'">'+inner+'</div>';
+  }).join('');
 }
-document.getElementById('miniBtn').addEventListener('click',()=>{ renderMini(); miniPop.classList.add('on'); });
+function openMiniWindow(){
+  const w=window.open('','miniKeycap','width=270,height=330,menubar=no,toolbar=no,location=no,status=no,resizable=yes');
+  if(!w) return false;
+  const doc='<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+    +'<title>미니 키캡</title>'
+    +'<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@700;800&family=Space+Grotesk:wght@700&family=JetBrains+Mono:wght@700&family=Gowun+Batang:wght@700&display=swap" rel="stylesheet">'
+    +'<style>*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{margin:0;min-height:100vh;background:radial-gradient(120% 90% at 50% 0%,#F4F0FA,#E2DCEE);display:flex;flex-wrap:wrap;gap:9px;justify-content:center;align-content:flex-start;padding:14px;font-family:"Gothic A1",sans-serif;user-select:none;-webkit-user-select:none;touch-action:manipulation}'
+    +'.mkc{width:54px;height:54px;border-radius:12px;position:relative;overflow:hidden;cursor:pointer;background-size:cover;background-position:center;box-shadow:0 6px 0 var(--s),0 8px 9px rgba(60,40,90,.22);transform:translateY(0);transition:transform .05s,box-shadow .05s;display:flex;align-items:center;justify-content:center}'
+    +'.mkc.p{transform:translateY(6px);box-shadow:0 1px 0 var(--s),0 3px 5px rgba(60,40,90,.2)}'
+    +'.l{font-weight:700;font-size:19px;line-height:1;pointer-events:none}.f{font-size:28px;line-height:1;pointer-events:none}</style></head>'
+    +'<body><div id="t">'+miniKcMarkup()+'</div><script>'
+    +'var op=window.opener,act=null,t=document.getElementById("t");'
+    +'t.addEventListener("pointerdown",function(e){var el=e.target.closest(".mkc");if(!el)return;e.preventDefault();el.classList.add("p");act=el;if(op&&!op.closed)op.postMessage({mk:"press",i:+el.dataset.i},"*");});'
+    +'window.addEventListener("pointerup",function(){if(act){act.classList.remove("p");if(op&&!op.closed)op.postMessage({mk:"release",i:+act.dataset.i},"*");act=null;}});'
+    +'<\/script></body></html>';
+  w.document.open(); w.document.write(doc); w.document.close();
+  return true;
+}
+document.getElementById('miniBtn').addEventListener('click',()=>{
+  resumeCtx();
+  if(!openMiniWindow()){ // 팝업 차단 시 화면 안 팝업으로 대체
+    miniTray.innerHTML=miniKcMarkup(); miniPop.classList.add('on');
+  }
+});
 document.getElementById('miniClose').addEventListener('click',()=>miniPop.classList.remove('on'));
+// 분리 창/대체 팝업에서 온 누름 → 이 창에서 소리 재생
+window.addEventListener('message',e=>{ const d=e.data; if(!d||!d.mk)return; const kc=keycaps[d.i]; if(!kc)return;
+  if(d.mk==='press'){ resumeCtx(); playSample(kc,'press'); count++; document.getElementById('count').textContent=count.toLocaleString(); }
+  else playSample(kc,'release'); });
+// 대체(화면 안) 팝업 눌렀을 때도 소리
 let mAct=null;
-miniTray.addEventListener('pointerdown',e=>{ const el=e.target.closest('.mkc'); if(!el)return; e.preventDefault(); resumeCtx(); const i=+el.dataset.i; el.classList.add('pressed'); el._i=i; playSample(keycaps[i],'press'); count++; document.getElementById('count').textContent=count.toLocaleString(); buzz(11); mAct=el; });
-window.addEventListener('pointerup',()=>{ if(mAct){ mAct.classList.remove('pressed'); playSample(keycaps[mAct._i],'release'); mAct=null; } });
+miniTray.addEventListener('pointerdown',e=>{ const el=e.target.closest('.mkc'); if(!el)return; e.preventDefault(); resumeCtx(); const i=+el.dataset.i; el.classList.add('p'); mAct=el; playSample(keycaps[i],'press'); count++; document.getElementById('count').textContent=count.toLocaleString(); });
+window.addEventListener('pointerup',()=>{ if(mAct){ mAct.classList.remove('p'); playSample(keycaps[+mAct.dataset.i],'release'); mAct=null; } });
 (function(){ const head=document.getElementById('miniHead'); let dg=false,ox=0,oy=0;
   head.addEventListener('pointerdown',e=>{ dg=true; const r=miniPop.getBoundingClientRect(); ox=e.clientX-r.left; oy=e.clientY-r.top; miniPop.style.left=r.left+'px'; miniPop.style.top=r.top+'px'; miniPop.style.transform='none'; head.setPointerCapture(e.pointerId); });
   head.addEventListener('pointermove',e=>{ if(!dg)return; miniPop.style.left=(e.clientX-ox)+'px'; miniPop.style.top=(e.clientY-oy)+'px'; });
