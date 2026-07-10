@@ -622,6 +622,8 @@ function openMiniWindow(){
     +'var op=window.opener,act=null,t=document.getElementById("t");'
     +'t.addEventListener("pointerdown",function(e){var el=e.target.closest(".mkc");if(!el)return;e.preventDefault();el.classList.add("p");act=el;if(op&&!op.closed)op.postMessage({mk:"press",i:+el.dataset.i},"*");});'
     +'window.addEventListener("pointerup",function(){if(act){act.classList.remove("p");if(op&&!op.closed)op.postMessage({mk:"release",i:+act.dataset.i},"*");act=null;}});'
+    +'var kmap={};window.addEventListener("keydown",function(e){if(e.repeat)return;var i=null;if(/^[1-9]$/.test(e.key)){i=+e.key-1;}if(i===null)return;var el=t.querySelector(\'.mkc[data-i="\'+i+\'"]\');if(!el)return;e.preventDefault();el.classList.add("p");kmap[e.code]=i;if(op&&!op.closed)op.postMessage({mk:"press",i:i},"*");});'
+    +'window.addEventListener("keyup",function(e){var i=kmap[e.code];if(i===undefined)return;var el=t.querySelector(\'.mkc[data-i="\'+i+\'"]\');if(el)el.classList.remove("p");delete kmap[e.code];if(op&&!op.closed)op.postMessage({mk:"release",i:i},"*");});'
     +'<\/script></body></html>';
   w.document.open(); w.document.write(doc); w.document.close();
   return true;
